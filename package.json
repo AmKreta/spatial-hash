@@ -24,6 +24,13 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amk-utils/spatialhash.git"
+  },
   "sideEffects": false,
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json && cp dist/index.d.ts dist/index.d.cts",
