@@ -19,13 +19,13 @@ Works in Node and in the browser: ESM for bundlers and modern Node, CommonJS for
 ## Install
 
 ```sh
-npm install spatialhash
+npm install @amk-utils/spatialhash
 ```
 
 ## Use
 
 ```ts
-import { SpatialHash } from "spatialhash";
+import { SpatialHash } from "@amk-utils/spatialhash";
 
 type Sprite = {
     x: number;
@@ -55,13 +55,13 @@ Ids are `number` or `string`. `1` and `"1"` are different ids.
 Node CommonJS:
 
 ```js
-const { SpatialHash } = require("spatialhash");
+const { SpatialHash } = require("@amk-utils/spatialhash");
 ```
 
 Browser script tag (IIFE). Named exports are on the `SpatialHash` global:
 
 ```html
-<script src="https://unpkg.com/spatialhash"></script>
+<script src="https://unpkg.com/@amk-utils/spatialhash"></script>
 <script>
   const world = new SpatialHash.SpatialHash();
 </script>
