@@ -1,5 +1,5 @@
 {
-  "name": "spatialhash",
+  "name": "@amk-utils/spatialhash",
   "version": "1.0.0",
   "description": "A uniform spatial hash grid for axis-aligned items in games, canvases, and maps.",
   "type": "module",
