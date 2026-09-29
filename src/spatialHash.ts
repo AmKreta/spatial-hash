@@ -1,6 +1,14 @@
-import { Bounds, Hash, ItemId, SpatialHashOptions, SpatialItem } from "./types";
+import { Bounds, Hash, HashFunction, ItemId, SpatialHashOptions, SpatialItem } from "./types";
 import { cantorPairing } from "./utils/contorPairing";
 import { zigZagEncode } from "./utils/zigZagEncode";
+
+/**
+ * Default cell hash. Negative coordinates are zigzag-encoded so Cantor pairing
+ * stays in the non-negative domain.
+ */
+function defaultHash(x: number, y: number): number {
+    return cantorPairing(zigZagEncode(x), zigZagEncode(y));
+}
 
 /**
  * Uniform grid of axis-aligned items.
@@ -17,13 +25,15 @@ export class SpatialHash<T extends Bounds> {
     private readonly grid = new Map<Hash, Set<ItemId>>();
     /** Item id to its payload and the cell hashes it occupies. */
     private readonly items = new Map<ItemId, SpatialItem<T>>();
+    /** Maps a cell column and row to a bucket key. */
+    private readonly hashFunction: HashFunction;
 
     /**
      * Creates an empty spatial hash.
-     * @param options - Cell size and query margin. Omitted values use the defaults.
+     * @param options - Cell size, query margin, and optional cell hash. Omitted values use the defaults.
      * @throws If `cellSize` is not greater than `0`, or if `threshold` is negative.
      */
-    constructor({cellSize = 100, threshold = 1}: SpatialHashOptions) {
+    constructor({cellSize = 100, threshold = 1, hashFunction = defaultHash}: SpatialHashOptions) {
         if (cellSize <= 0) {
             throw new Error("cellSize must be greater than 0");
         }
@@ -32,6 +42,7 @@ export class SpatialHash<T extends Bounds> {
         }
         this.cellSize = cellSize;
         this.threshold = threshold;
+        this.hashFunction = hashFunction;
     }
 
 
@@ -58,7 +69,7 @@ export class SpatialHash<T extends Bounds> {
      * @param id - Id of the item to remove.
      * @returns `true` when the item was removed, `false` when it was not stored.
      */
-    remove(id: string): boolean {
+    remove(id: ItemId): boolean {
         const item = this.items.get(id);
         if (!item) {
             return false;
@@ -76,7 +87,7 @@ export class SpatialHash<T extends Bounds> {
      * @param data - New bounds and payload.
      * @throws If `id` is not stored.
      */
-    update(id: string, data: T): void {
+    update(id: ItemId, data: T): void {
         const item = this.items.get(id);
         if (!item) {
             throw new Error(`SpatialHash: item "${id}" does not exist`);
@@ -245,7 +256,7 @@ export class SpatialHash<T extends Bounds> {
      * @param cell - Cell hash.
      * @param id - Item id to remove from that cell.
      */
-    private removeFromCell(cell: Hash, id: string,): void {
+    private removeFromCell(cell: Hash, id: ItemId): void {
         const bucket = this.grid.get(cell);
         if (!bucket) {
             return;
@@ -276,12 +287,11 @@ export class SpatialHash<T extends Bounds> {
 
     /**
      * Hashes a cell coordinate into a single bucket key.
-     * Negative coordinates are zigzag-encoded so Cantor pairing stays in the non-negative domain.
      * @param x - Cell column.
      * @param y - Cell row.
      * @returns Bucket key for that cell.
      */
     private hash(x: number, y: number): Hash {
-        return cantorPairing(zigZagEncode(x), zigZagEncode(y));
+        return this.hashFunction(x, y);
     }
 }
