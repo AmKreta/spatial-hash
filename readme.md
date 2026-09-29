@@ -107,10 +107,10 @@ npm run build
 
 ## Publish
 
-Publishing is handled by `.github/workflows/publish.yml`. It runs on a GitHub Release, and can also be started by hand.
+Publishing is handled by `.github/workflows/publish.yml`. It runs on every push to `main`.
 
 1. Add an `NPM_TOKEN` repository secret with an npm automation token that can publish this package.
-2. Bump `version` in `package.json`.
-3. Create a GitHub Release (or run the **Publish to npm** workflow).
+2. Bump `version` in `package.json` before merging to `main`.
+3. Push or merge to `main`.
 
 The job typechecks, tests, builds ESM / CJS / IIFE plus declaration files, then publishes with provenance. The npm package page can also use GitHub as a [trusted publisher](https://docs.npmjs.com/trusted-publishers) so the OIDC token is enough.
