@@ -33,7 +33,11 @@ export class SpatialHash<T extends Bounds> {
      * @param options - Cell size, query margin, and optional cell hash. Omitted values use the defaults.
      * @throws If `cellSize` is not greater than `0`, or if `threshold` is negative.
      */
-    constructor({cellSize = 100, threshold = 1, hashFunction = defaultHash}: SpatialHashOptions) {
+    constructor({
+        cellSize = 100,
+        threshold = 1,
+        hashFunction = defaultHash,
+    }: SpatialHashOptions = {}) {
         if (cellSize <= 0) {
             throw new Error("cellSize must be greater than 0");
         }

@@ -14,6 +14,14 @@ Use it when you need nearby objects in a 2D scene — sprites, colliders, map ma
 
 The default hash keeps negative cell coordinates unique, so the grid does not need a fixed origin or world size.
 
+Works in Node and in the browser: ESM for bundlers and modern Node, CommonJS for `require`, and an IIFE build for a script tag.
+
+## Install
+
+```sh
+npm install spatialhash
+```
+
 ## Use
 
 ```ts
@@ -43,6 +51,21 @@ world.clear();
 An item needs `x`, `y`, `width`, and `height`. Extra fields are kept and returned with the item. `width` and `height` must be greater than `0`; otherwise the item is stored but occupies no cells, so queries will not find it.
 
 Ids are `number` or `string`. `1` and `"1"` are different ids.
+
+Node CommonJS:
+
+```js
+const { SpatialHash } = require("spatialhash");
+```
+
+Browser script tag (IIFE). Named exports are on the `SpatialHash` global:
+
+```html
+<script src="https://unpkg.com/spatialhash"></script>
+<script>
+  const world = new SpatialHash.SpatialHash();
+</script>
+```
 
 ## Query
 
@@ -74,3 +97,20 @@ new SpatialHash<Sprite>({
 - `cellSize` — world-space size of one cell. Default `100`. Must be greater than `0`. A size close to a typical item keeps each query to a few cells.
 - `threshold` — extra cells added on each side of a query before buckets are collected. Default `1`. Must be `0` or greater.
 - `hashFunction` — maps a cell column and row to a `number` or `string` bucket key. The default zigzag-encodes the coordinates, then combines them with Cantor pairing so negative cells stay unique.
+
+## Scripts
+
+```sh
+npm test
+npm run build
+```
+
+## Publish
+
+Publishing is handled by `.github/workflows/publish.yml`. It runs on a GitHub Release, and can also be started by hand.
+
+1. Add an `NPM_TOKEN` repository secret with an npm automation token that can publish this package.
+2. Bump `version` in `package.json`.
+3. Create a GitHub Release (or run the **Publish to npm** workflow).
+
+The job typechecks, tests, builds ESM / CJS / IIFE plus declaration files, then publishes with provenance. The npm package page can also use GitHub as a [trusted publisher](https://docs.npmjs.com/trusted-publishers) so the OIDC token is enough.
