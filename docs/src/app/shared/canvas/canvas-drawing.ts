@@ -3,11 +3,14 @@ export type CanvasParticle = {
   cy: number;
   radius: number;
   color: string;
+  inTarget: boolean;
 };
 
+export type TargetRegion = { x: number; y: number; width: number; height: number };
+
 const BACKGROUND = '#101212';
-const LINK_COLOR = 'rgba(197, 243, 106, 0.2)';
-const PARTICLE_COLORS = ['#c5f36a', '#78e3cb', '#ffa779', '#ae9bff', '#f6d36b'];
+const TARGET_COLOR = '#fff36a';
+const PARTICLE_COLORS = ['#667442', '#4a6961', '#795f4d', '#645a7c', '#786c46'];
 
 export function particleColor(index: number): string {
   return PARTICLE_COLORS[index % PARTICLE_COLORS.length];
@@ -22,22 +25,19 @@ export function clearCanvas(
   context.fillRect(0, 0, width, height);
 }
 
-export function drawConnections(
+export function drawTargetBorder(
   context: OffscreenCanvasRenderingContext2D,
-  coordinates: Float32Array,
-  count: number,
+  target: TargetRegion,
 ): void {
-  if (count === 0) return;
-
+  context.save();
   context.beginPath();
-  for (let index = 0; index < count; index++) {
-    const offset = index * 4;
-    context.moveTo(coordinates[offset], coordinates[offset + 1]);
-    context.lineTo(coordinates[offset + 2], coordinates[offset + 3]);
-  }
-  context.strokeStyle = LINK_COLOR;
-  context.lineWidth = 0.6;
+  context.rect(target.x, target.y, target.width, target.height);
+  context.setLineDash([2, 5]);
+  context.lineCap = 'round';
+  context.strokeStyle = TARGET_COLOR;
+  context.lineWidth = 1.5;
   context.stroke();
+  context.restore();
 }
 
 export function drawParticles(
@@ -47,7 +47,9 @@ export function drawParticles(
   for (const particle of particles) {
     context.beginPath();
     context.arc(particle.cx, particle.cy, particle.radius, 0, Math.PI * 2);
-    context.fillStyle = particle.color;
+    context.globalAlpha = particle.inTarget ? 1 : 0.55;
+    context.fillStyle = particle.inTarget ? TARGET_COLOR : particle.color;
     context.fill();
   }
+  context.globalAlpha = 1;
 }

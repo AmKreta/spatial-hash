@@ -401,38 +401,49 @@ footer {
   justify-content: space-between;
 }
 .demo-page {
-  max-width: 1120px;
+  max-width: 1500px;
   margin: auto;
-  padding: 48px 32px 90px;
+  padding: 40px 32px 80px;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.8fr);
+  gap: 28px;
+  align-items: stretch;
 }
-.demo-heading {
-  display: block;
-  margin-bottom: 18px;
+.demo-copy {
+  position: sticky;
+  top: 98px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 620px;
 }
-.demo-heading h1 {
-  font-size: 34px;
-  letter-spacing: -1.3px;
-  line-height: 1.15;
-  white-space: nowrap;
-  margin: 2px 0 0;
+.demo-copy h1 {
+  font:
+    600 38px/1.08 'Space Grotesk',
+    sans-serif;
+  letter-spacing: -1.8px;
+  margin: 12px 0;
 }
-.demo-heading > p {
-  max-width: none;
+.demo-copy h1 em {
+  color: var(--lime);
+  font-style: normal;
+}
+.demo-lead {
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 20px;
 }
 .controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 17px;
+  gap: 10px 12px;
   border: 1px solid var(--line);
   background: var(--panel);
   padding: 12px 16px;
   border-radius: 8px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 .controls label {
   font-size: 12px;
@@ -445,18 +456,21 @@ footer {
 }
 .controls input {
   accent-color: var(--lime);
-  flex: 1;
-  min-width: 100px;
+  grid-column: 1 / -1;
+  width: 100%;
 }
 .control-note {
+  grid-column: 1 / -1;
   font-size: 10px;
   color: #858d86;
-  white-space: nowrap;
+}
+.simulations {
+  min-width: 0;
 }
 .sim-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 .sim-card {
   border: 1px solid var(--line);
@@ -506,33 +520,62 @@ footer {
 .sim-card canvas {
   display: block;
   width: 100%;
-  height: 380px;
+  height: clamp(210px, 25vw, 340px);
   background: #101212;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 .sim-stats {
-  display: flex;
-  padding: 12px 17px;
-  gap: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 11px 14px;
+  gap: 8px;
 }
 .sim-stats div {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .sim-stats strong {
-  font: 15px 'DM Mono';
+  font: 14px 'DM Mono';
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sim-stats span {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--muted);
+  line-height: 1.4;
+}
+.comparison-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+.performance-chart {
+  height: 300px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #121614;
+}
+.performance-chart h3 {
+  margin: 0 0 7px;
+  color: #aab1a9;
+  font:
+    500 11px 'DM Mono',
+    monospace;
+}
+.chart-canvas-wrap {
+  position: relative;
+  height: 245px;
 }
 .demo-footnote {
   font-size: 11px;
-  line-height: 1.8;
+  line-height: 1.65;
   color: var(--muted);
-  margin: 19px 0;
+  margin: 18px 0;
 }
 .demo-insight {
   border: 1px solid #c5f36a2a;
@@ -578,6 +621,12 @@ footer {
   }
   .demo-page {
     padding: 45px 22px;
+    grid-template-columns: 1fr;
+  }
+  .demo-copy {
+    position: static;
+    min-height: 0;
+    gap: 12px;
   }
   .topbar {
     padding: 0 22px;
@@ -610,20 +659,8 @@ footer {
     grid-template-columns: 1fr;
     gap: 3px;
   }
-  .demo-heading {
-    display: block;
-  }
-  .demo-heading > p {
-    margin-top: 17px;
-    white-space: normal;
-  }
-  .demo-heading h1 {
-    font-size: 28px;
-    white-space: normal;
-  }
-  .controls {
-    flex-wrap: wrap;
-    gap: 10px;
+  .demo-copy h1 {
+    font-size: 32px;
   }
   .control-note {
     display: none;
@@ -631,10 +668,31 @@ footer {
   .sim-grid {
     grid-template-columns: 1fr;
   }
+  .performance-chart {
+    height: 260px;
+    padding: 12px;
+  }
+  .chart-canvas-wrap {
+    height: 210px;
+  }
+  .comparison-charts {
+    grid-template-columns: 1fr;
+  }
   .sim-card canvas {
     height: 250px;
   }
+  .sim-stats {
+    padding: 10px;
+    gap: 5px;
+  }
+  .sim-stats strong {
+    font-size: 11px;
+  }
+  .sim-stats span {
+    font-size: 8px;
+  }
   .demo-page {
-    padding-top: 35px;
+    gap: 22px;
+    padding: 35px 22px 80px;
   }
 }

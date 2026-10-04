@@ -41,6 +41,7 @@ world.add('player', { x: 10, y: 20, width: 32, height: 32, name: 'player' });
 world.add(2, { x: 80, y: 40, width: 16, height: 16, name: 'coin' });
 
 const nearby = world.getItemsBetween(0, 0, 100, 100);
+const { items, comparisons } = world.getItemsBetweenWithStats(0, 0, 100, 100);
 
 world.update('player', { x: 50, y: 20, width: 32, height: 32, name: 'player' });
 world.remove(2);
@@ -75,14 +76,15 @@ Before the cell lookup, the query is expanded by `cellSize * threshold` on every
 
 ## API
 
-| Method                                 | Behavior                                                                                                            |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `add(id, data)`                        | Inserts an item. Throws if `id` is already stored.                                                                  |
-| `remove(id)`                           | Removes an item. Returns `true` when it was stored, `false` otherwise.                                              |
-| `update(id, data)`                     | Replaces bounds and payload, and moves the item between cells when its coverage changes. Throws if `id` is missing. |
-| `getItemsBetween(x, y, width, height)` | Returns items that overlap the rectangle.                                                                           |
-| `size`                                 | Number of stored items.                                                                                             |
-| `clear()`                              | Removes every item.                                                                                                 |
+| Method                                          | Behavior                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `add(id, data)`                                 | Inserts an item. Throws if `id` is already stored.                                                                  |
+| `remove(id)`                                    | Removes an item. Returns `true` when it was stored, `false` otherwise.                                              |
+| `update(id, data)`                              | Replaces bounds and payload, and moves the item between cells when its coverage changes. Throws if `id` is missing. |
+| `getItemsBetween(x, y, width, height)`          | Returns items that overlap the rectangle.                                                                           |
+| `getItemsBetweenWithStats(x, y, width, height)` | Returns matching items and the number of candidate bounds checked.                                                  |
+| `size`                                          | Number of stored items.                                                                                             |
+| `clear()`                                       | Removes every item.                                                                                                 |
 
 ## Options
 

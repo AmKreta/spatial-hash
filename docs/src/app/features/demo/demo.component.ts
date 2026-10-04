@@ -1,4 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
+import { PerformanceChartComponent } from '../../shared/charts/performance-chart.component';
 import {
   AfterViewInit,
   Component,
@@ -10,12 +11,22 @@ import {
   signal,
 } from '@angular/core';
 
-type Stats = { checks: number; hits: number; total: number };
-type SimMessage = { type: 'stats'; checks: number; hits: number; total: number };
+type Stats = { comparisons: number; inside: number; durationMs: number };
+type SimMessage = {
+  type: 'stats';
+  comparisons: number;
+  inside: number;
+  durationMs: number;
+};
+type SampleAccumulator = { frames: number; comparisons: number; durationMs: number };
+
+const PERFORMANCE_SAMPLE_FRAME_COUNT = 10;
+const MAX_PERFORMANCE_SAMPLES = 60;
 
 @Component({
   selector: 'app-demo-page',
   standalone: true,
+  imports: [PerformanceChartComponent],
   templateUrl: './demo.component.html',
 })
 export class DemoComponent implements AfterViewInit, OnDestroy {
@@ -24,10 +35,24 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
 
   readonly particleCount = signal(100);
   readonly paused = signal(false);
-  readonly naiveStats = signal<Stats>({ checks: 0, hits: 0, total: 100 });
-  readonly hashStats = signal<Stats>({ checks: 0, hits: 0, total: 100 });
+  readonly naiveStats = signal<Stats>({ comparisons: 0, inside: 0, durationMs: 0 });
+  readonly hashStats = signal<Stats>({ comparisons: 0, inside: 0, durationMs: 0 });
+  readonly naiveHistory = signal<number[]>([]);
+  readonly hashHistory = signal<number[]>([]);
+  readonly naiveComparisonsHistory = signal<number[]>([]);
+  readonly hashComparisonsHistory = signal<number[]>([]);
 
   private workers: Worker[] = [];
+  private readonly naiveAccumulator: SampleAccumulator = {
+    frames: 0,
+    comparisons: 0,
+    durationMs: 0,
+  };
+  private readonly hashAccumulator: SampleAccumulator = {
+    frames: 0,
+    comparisons: 0,
+    durationMs: 0,
+  };
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   ngAfterViewInit(): void {
@@ -37,13 +62,27 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
       this.naiveCanvas?.nativeElement,
       () =>
         new Worker(new URL('./workers/brute-force.worker', import.meta.url), { type: 'module' }),
-      this.naiveStats.set,
+      (stats) =>
+        this.recordStats(
+          stats,
+          this.naiveStats,
+          this.naiveHistory,
+          this.naiveComparisonsHistory,
+          this.naiveAccumulator,
+        ),
     );
     this.startWorker(
       this.hashCanvas?.nativeElement,
       () =>
         new Worker(new URL('./workers/spatial-hash.worker', import.meta.url), { type: 'module' }),
-      this.hashStats.set,
+      (stats) =>
+        this.recordStats(
+          stats,
+          this.hashStats,
+          this.hashHistory,
+          this.hashComparisonsHistory,
+          this.hashAccumulator,
+        ),
     );
   }
 
@@ -83,5 +122,33 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
     const canvas = element.transferControlToOffscreen();
     worker.postMessage({ type: 'init', canvas, seed: 1492, count: this.particleCount() }, [canvas]);
     this.workers.push(worker);
+  }
+
+  private recordStats(
+    stats: Stats,
+    current: typeof this.naiveStats,
+    history: typeof this.naiveHistory,
+    comparisonsHistory: typeof this.naiveComparisonsHistory,
+    accumulator: SampleAccumulator,
+  ): void {
+    current.set(stats);
+    accumulator.frames++;
+    accumulator.comparisons += stats.comparisons;
+    accumulator.durationMs += stats.durationMs;
+    if (accumulator.frames < PERFORMANCE_SAMPLE_FRAME_COUNT) return;
+
+    const averageComparisons = accumulator.comparisons / accumulator.frames;
+    const averageDuration = accumulator.durationMs / accumulator.frames;
+    history.update((samples) => [
+      ...samples.slice(-(MAX_PERFORMANCE_SAMPLES - 1)),
+      averageDuration,
+    ]);
+    comparisonsHistory.update((samples) => [
+      ...samples.slice(-(MAX_PERFORMANCE_SAMPLES - 1)),
+      averageComparisons,
+    ]);
+    accumulator.frames = 0;
+    accumulator.comparisons = 0;
+    accumulator.durationMs = 0;
   }
 }

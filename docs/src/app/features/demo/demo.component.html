@@ -1,87 +1,116 @@
 <main class="demo-page">
-  <div class="demo-heading">
-    <div>
-      <div class="eyebrow">THE GRID IN MOTION</div>
-      <h1>Same particles. <em>Smarter shortlist.</em></h1>
+  <aside class="demo-copy">
+    <div class="eyebrow">THE GRID IN MOTION</div>
+    <h1>Same particles. <em>Smarter shortlist.</em></h1>
+    <p class="demo-lead">
+      Two identical worlds. One scans every particle; the other checks only target-cell candidates
+      with SpatialHash.
+    </p>
+
+    <div class="controls">
+      <label for="count"
+        >Particles <strong>{{ particleCount() }}</strong></label
+      >
+      <input
+        id="count"
+        type="range"
+        min="100"
+        max="3000"
+        step="100"
+        [value]="particleCount()"
+        (input)="setCount($event)"
+      />
+      <span class="control-note">Watch the target lookup as the particle count grows.</span>
+      <button class="button secondary" (click)="toggleRun()">
+        {{ paused() ? 'Resume' : 'Pause' }}
+      </button>
     </div>
-    <p>
-      Two identical worlds. One checks every pair; the other checks nearby neighbors with
-      SpatialHash.
+
+    <p class="demo-footnote">
+      Particles move in straight lines and bounce off the walls. Entering the dotted center target
+      turns a particle bright yellow; particles outside stay muted. Each canvas runs in its own Web
+      Worker with a dedicated OffscreenCanvas. Processing time includes the full brute-force scan or
+      the SpatialHash refresh plus its target query; cooperative yield waits are excluded.
     </p>
-  </div>
-  <div class="controls">
-    <label for="count"
-      >Particles <strong>{{ particleCount() }}</strong></label
-    ><input
-      id="count"
-      type="range"
-      min="100"
-      max="1200"
-      step="100"
-      [value]="particleCount()"
-      (input)="setCount($event)"
-    /><span class="control-note">More dots make the difference easier to spot.</span
-    ><button class="button secondary" (click)="toggleRun()">
-      {{ paused() ? 'Resume' : 'Pause' }}
-    </button>
-  </div>
-  <div class="sim-grid">
-    <section class="sim-card">
-      <div class="sim-title">
-        <span class="dot orange"></span>
-        <div>
-          <h2>Brute force</h2>
-          <p>Every possible pair</p>
+
+    <div class="demo-insight">
+      <span aria-hidden="true">↗</span>
+      <p>
+        <strong>What to watch:</strong> brute force checks all n particle positions. SpatialHash
+        checks only k candidates from cells around the target. The scan is O(n); the indexed query
+        is O(k) after an O(n) refresh for the moving particles.
+      </p>
+    </div>
+  </aside>
+
+  <section class="simulations" aria-label="Simulation comparison">
+    <div class="sim-grid">
+      <section class="sim-card">
+        <div class="sim-title">
+          <span class="dot orange"></span>
+          <div>
+            <h2>Brute force</h2>
+            <p>Scan every particle</p>
+          </div>
+          <span class="complexity">O(n)</span>
         </div>
-        <span class="complexity">O(n²)</span>
-      </div>
-      <canvas #naiveCanvas></canvas>
-      <div class="sim-stats">
-        <div>
-          <strong>{{ naiveStats().checks.toLocaleString() }}</strong
-          ><span>pair checks / frame</span>
+        <canvas #naiveCanvas aria-label="Brute force particle simulation"></canvas>
+        <div class="sim-stats">
+          <div>
+            <strong>{{ naiveStats().comparisons.toLocaleString() }}</strong>
+            <span>particle comparisons / frame</span>
+          </div>
+          <div>
+            <strong>{{ naiveStats().durationMs.toFixed(3) }} ms</strong>
+            <span>full scan / frame</span>
+          </div>
+          <div>
+            <strong>{{ naiveStats().inside.toLocaleString() }}</strong>
+            <span>particles in target</span>
+          </div>
         </div>
-        <div>
-          <strong>{{ naiveStats().hits }}</strong
-          ><span>collisions detected</span>
+      </section>
+
+      <section class="sim-card">
+        <div class="sim-title">
+          <span class="dot green"></span>
+          <div>
+            <h2>SpatialHash</h2>
+            <p>Query target cells</p>
+          </div>
+          <span class="complexity fast" title="Query complexity after index refresh">O(k)</span>
         </div>
-      </div>
-    </section>
-    <section class="sim-card">
-      <div class="sim-title">
-        <span class="dot green"></span>
-        <div>
-          <h2>SpatialHash</h2>
-          <p>Nearby pairs only</p>
+        <canvas #hashCanvas aria-label="SpatialHash particle simulation"></canvas>
+        <div class="sim-stats">
+          <div>
+            <strong>{{ hashStats().comparisons.toLocaleString() }}</strong>
+            <span>particle comparisons / frame</span>
+          </div>
+          <div>
+            <strong>{{ hashStats().durationMs.toFixed(3) }} ms</strong>
+            <span>index + query / frame</span>
+          </div>
+          <div>
+            <strong>{{ hashStats().inside.toLocaleString() }}</strong>
+            <span>particles in target</span>
+          </div>
         </div>
-        <span class="complexity fast">O(n+k)</span>
-      </div>
-      <canvas #hashCanvas></canvas>
-      <div class="sim-stats">
-        <div>
-          <strong>{{ hashStats().checks.toLocaleString() }}</strong
-          ><span>pair checks / frame</span>
-        </div>
-        <div>
-          <strong>{{ hashStats().hits }}</strong
-          ><span>collisions detected</span>
-        </div>
-      </div>
-    </section>
-  </div>
-  <p class="demo-footnote">
-    Both simulations use straight-line motion (y = mx + c) with randomized dx and dy of ±1 after a
-    wall or particle collision. A line connects each pair of particles whose centers are less than
-    100 pixels apart. The brute-force and SpatialHash canvases each run in a dedicated Web Worker
-    with their own OffscreenCanvas.
-  </p>
-  <div class="demo-insight">
-    <span>↗</span>
-    <p>
-      <strong>What to watch:</strong> at {{ particleCount() }} particles, brute force considers up
-      to n(n − 1) / 2 pairs each frame. SpatialHash narrows each particle's candidates to a local
-      100-pixel neighborhood. Both workers yield between batches so the controls stay responsive at
-      high counts.
-    </p>
-  </div>
+      </section>
+    </div>
+
+    <div class="comparison-charts">
+      <app-performance-chart
+        title="Position comparisons · 10-frame average"
+        unit="comparisons / frame"
+        [bruteForce]="naiveComparisonsHistory()"
+        [spatialHash]="hashComparisonsHistory()"
+      />
+      <app-performance-chart
+        title="Detection time · 10-frame average"
+        unit="ms / frame"
+        [bruteForce]="naiveHistory()"
+        [spatialHash]="hashHistory()"
+      />
+    </div>
+  </section>
 </main>

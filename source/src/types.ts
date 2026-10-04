@@ -21,6 +21,13 @@ export type SpatialItem<T extends Bounds> = {
   data: T;
 };
 
+export type SpatialHashQueryResult<T> = {
+  /** Items whose bounds intersect the query rectangle. */
+  items: T[];
+  /** Candidate items whose bounds were checked after gathering occupied cells. */
+  comparisons: number;
+};
+
 export type SpatialHashOptions = {
   cellSize?: number;
   threshold?: number;

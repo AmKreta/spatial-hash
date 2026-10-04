@@ -2,9 +2,10 @@ import { SpatialHash } from '@amk-utils/spatialhash';
 import {
   CanvasParticle,
   clearCanvas,
-  drawConnections,
   drawParticles,
+  drawTargetBorder,
   particleColor,
+  TargetRegion,
 } from '../../../shared/canvas/canvas-drawing';
 
 type Particle = CanvasParticle & {
@@ -23,14 +24,18 @@ type WorkerMessage =
   | { type: 'run'; running: boolean };
 
 type SimulationMode = 'brute-force' | 'spatial-hash';
-type Stats = { type: 'stats'; checks: number; hits: number; total: number };
+type Stats = {
+  type: 'stats';
+  comparisons: number;
+  inside: number;
+  durationMs: number;
+};
 
-const LINK_DISTANCE = 100;
-const LINK_DISTANCE_SQUARED = LINK_DISTANCE * LINK_DISTANCE;
-const COLLISION_RADIUS = 5;
-const CHUNK_SIZE = 250_000;
-const CONNECTION_BATCH_SIZE = 8_192;
-const PROGRESS_INTERVAL = 10_000_000;
+const TARGET_CELL_SIZE = 100;
+const PARTICLE_RADIUS = 5;
+const CHUNK_SIZE = 2_000;
+const TARGET_WIDTH_RATIO = 0.34;
+const TARGET_HEIGHT_RATIO = 0.36;
 
 export function startSimulation(mode: SimulationMode): void {
   let canvas: OffscreenCanvas | undefined;
@@ -47,17 +52,20 @@ export function startSimulation(mode: SimulationMode): void {
 
     while (particles.length < target) {
       const index = particles.length;
-      const cx = random() * canvas.width;
-      const cy = random() * canvas.height;
+      const maxX = Math.max(PARTICLE_RADIUS, canvas.width - PARTICLE_RADIUS);
+      const maxY = Math.max(PARTICLE_RADIUS, canvas.height - PARTICLE_RADIUS);
+      const cx = PARTICLE_RADIUS + random() * (maxX - PARTICLE_RADIUS);
+      const cy = PARTICLE_RADIUS + random() * (maxY - PARTICLE_RADIUS);
       particles.push({
-        x: cx - COLLISION_RADIUS,
-        y: cy - COLLISION_RADIUS,
+        x: cx - PARTICLE_RADIUS,
+        y: cy - PARTICLE_RADIUS,
         cx,
         cy,
-        width: COLLISION_RADIUS * 2,
-        height: COLLISION_RADIUS * 2,
-        radius: COLLISION_RADIUS,
+        width: PARTICLE_RADIUS * 2,
+        height: PARTICLE_RADIUS * 2,
+        radius: PARTICLE_RADIUS,
         color: particleColor(index),
+        inTarget: false,
         vx: random() < 0.5 ? -1 : 1,
         vy: random() < 0.5 ? -1 : 1,
         index,
@@ -65,6 +73,31 @@ export function startSimulation(mode: SimulationMode): void {
     }
 
     particles.length = target;
+  }
+
+  function getTargetRegion(width: number, height: number): TargetRegion {
+    const targetWidth = width * TARGET_WIDTH_RATIO;
+    const targetHeight = height * TARGET_HEIGHT_RATIO;
+    return {
+      x: (width - targetWidth) / 2,
+      y: (height - targetHeight) / 2,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  }
+
+  function intersectsTarget(particle: Particle, target: TargetRegion): boolean {
+    return (
+      particle.x < target.x + target.width &&
+      particle.x + particle.width > target.x &&
+      particle.y < target.y + target.height &&
+      particle.y + particle.height > target.y
+    );
+  }
+
+  async function yieldToWorkerMessages(): Promise<boolean> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    return running;
   }
 
   async function tick(time: number): Promise<void> {
@@ -92,92 +125,70 @@ export function startSimulation(mode: SimulationMode): void {
       }
       particle.x = particle.cx - particle.radius;
       particle.y = particle.cy - particle.radius;
+      particle.inTarget = false;
     }
 
-    clearCanvas(context, width, height);
-    let checks = 0;
-    let hits = 0;
-    let pendingConnections = 0;
-    let workSinceYield = 0;
-    let lastReportedChecks = 0;
-    const connectionCoordinates = new Float32Array(CONNECTION_BATCH_SIZE * 4);
+    const target = getTargetRegion(width, height);
+    let comparisons = 0;
+    let inside = 0;
+    let durationMs = 0;
 
-    const flushConnections = (): void => {
-      drawConnections(context!, connectionCoordinates, pendingConnections);
-      pendingConnections = 0;
-    };
-
-    const hash =
-      mode === 'spatial-hash'
-        ? new SpatialHash<Particle>({ cellSize: LINK_DISTANCE, threshold: 0 })
-        : undefined;
-    if (hash) {
-      for (const particle of frameParticles) hash.add(particle.index, particle);
-    }
-
-    for (let firstIndex = 0; firstIndex < frameCount; firstIndex++) {
-      const first = frameParticles[firstIndex];
-      const candidates = hash
-        ? hash
-            .getItemsBetween(
-              first.cx - LINK_DISTANCE,
-              first.cy - LINK_DISTANCE,
-              LINK_DISTANCE * 2,
-              LINK_DISTANCE * 2,
-            )
-            .filter((candidate) => candidate.index > firstIndex)
-            .sort((left, right) => left.index - right.index)
-        : frameParticles.slice(firstIndex + 1);
-
-      for (const second of candidates) {
-        const dx = second.cx - first.cx;
-        const dy = second.cy - first.cy;
-        const distanceSquared = dx * dx + dy * dy;
-        checks++;
-
-        if (distanceSquared < LINK_DISTANCE_SQUARED) {
-          const offset = pendingConnections * 4;
-          connectionCoordinates[offset] = first.cx;
-          connectionCoordinates[offset + 1] = first.cy;
-          connectionCoordinates[offset + 2] = second.cx;
-          connectionCoordinates[offset + 3] = second.cy;
-          pendingConnections++;
-          if (pendingConnections === CONNECTION_BATCH_SIZE) flushConnections();
+    if (mode === 'brute-force') {
+      let segmentStartedAt = performance.now();
+      for (let index = 0; index < frameCount; index++) {
+        const particle = frameParticles[index];
+        comparisons++;
+        if (intersectsTarget(particle, target)) {
+          particle.inTarget = true;
+          inside++;
         }
 
-        const collisionDistance = first.radius + second.radius;
-        if (distanceSquared < collisionDistance * collisionDistance) {
-          hits++;
-          first.vx = random() < 0.5 ? -1 : 1;
-          first.vy = random() < 0.5 ? -1 : 1;
-          second.vx = random() < 0.5 ? -1 : 1;
-          second.vy = random() < 0.5 ? -1 : 1;
-        }
-
-        workSinceYield++;
-        if (workSinceYield >= CHUNK_SIZE) {
-          flushConnections();
-          workSinceYield = 0;
-          if (checks - lastReportedChecks >= PROGRESS_INTERVAL) {
-            postMessage({ type: 'stats', checks, hits, total: frameCount });
-            lastReportedChecks = checks;
-          }
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-          if (!running) {
+        if ((index + 1) % CHUNK_SIZE === 0) {
+          durationMs += performance.now() - segmentStartedAt;
+          if (!(await yieldToWorkerMessages())) {
             busy = false;
             return;
           }
+          segmentStartedAt = performance.now();
         }
       }
+      durationMs += performance.now() - segmentStartedAt;
+    } else {
+      let segmentStartedAt = performance.now();
+      const hash = new SpatialHash<Particle>({ cellSize: TARGET_CELL_SIZE, threshold: 0 });
+      for (let index = 0; index < frameCount; index++) {
+        const particle = frameParticles[index];
+        hash.add(particle.index, particle);
+
+        if ((index + 1) % CHUNK_SIZE === 0) {
+          durationMs += performance.now() - segmentStartedAt;
+          if (!(await yieldToWorkerMessages())) {
+            busy = false;
+            return;
+          }
+          segmentStartedAt = performance.now();
+        }
+      }
+
+      durationMs += performance.now() - segmentStartedAt;
+      const queryStartedAt = performance.now();
+      const query = hash.getItemsBetweenWithStats(target.x, target.y, target.width, target.height);
+      durationMs += performance.now() - queryStartedAt;
+      comparisons = query.comparisons;
+      inside = query.items.length;
+      for (const particle of query.items) particle.inTarget = true;
     }
 
-    flushConnections();
+    clearCanvas(context, width, height);
     drawParticles(context, frameParticles);
-    const message: Stats = { type: 'stats', checks, hits, total: frameCount };
+    drawTargetBorder(context, target);
+
+    const message: Stats = { type: 'stats', comparisons, inside, durationMs };
     postMessage(message);
     busy = false;
     if (running) requestAnimationFrame((nextTime) => void tick(nextTime));
   }
+
   onmessage = (event: MessageEvent<WorkerMessage>) => {
     const message = event.data;
     if (message.type === 'init') {
