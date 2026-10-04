@@ -1,0 +1,298 @@
+<main class="docs-page">
+  <aside class="side-nav">
+    <span class="eyebrow">GUIDE</span>
+    <a href="#overview">Overview</a>
+    <a href="#install">Install</a>
+    <a href="#quickstart">Quick start</a>
+    <a href="#api">API reference</a>
+    <a href="#options">Options</a>
+    <a href="#internals">How it works</a>
+    <div class="side-card">
+      <span class="eyebrow">TRY IT YOURSELF</span>
+      <p>See the grid skip unnecessary collision checks.</p>
+      <a routerLink="/demo" class="text-link">Open particle demo ↗</a>
+    </div>
+  </aside>
+  <article class="article">
+    <div class="breadcrumb">SpatialHash <span>/</span> Documentation</div>
+    <div class="hero">
+      <div class="eyebrow">A TINY GRID WITH A BIG JOB</div>
+      <h1>Find what's nearby.<br /><em>Skip the rest.</em></h1>
+      <p class="lead">
+        SpatialHash is a lightweight uniform grid for quickly finding objects near a point or inside
+        a rectangle. It helps games, canvases, and maps avoid checking every object for every query.
+      </p>
+      <div class="hero-actions">
+        <a class="button primary" href="#quickstart">Get started <span>→</span></a
+        ><a
+          class="button secondary"
+          href="https://github.com/AmKreta/spatial-hash"
+          target="_blank"
+          rel="noreferrer"
+          >View source ↗</a
+        >
+      </div>
+      <div class="hero-meta">
+        <span><i></i> TypeScript</span><span>ESM · CommonJS · Browser</span
+        ><span>Zero runtime dependencies</span>
+      </div>
+    </div>
+    <section id="overview">
+      <div class="section-label">01 — THE IDEA</div>
+      <h2>Nearby objects, without the full scan.</h2>
+      <p>
+        Imagine a huge floor divided into square tiles. Each item is placed into every tile its
+        rectangle touches. When you ask what overlaps a region, SpatialHash looks in the relevant
+        tiles, then checks the real bounds of those few candidates.
+      </p>
+      <div class="diagram">
+        <div class="grid-visual">
+          <span class="object o1"></span><span class="object o2"></span><span class="query"></span
+          ><span class="cell-label">CELL SIZE</span>
+        </div>
+        <div class="diagram-copy">
+          <strong>One lookup. A small shortlist.</strong>
+          <p>
+            A naive scan checks every item (<code>O(n)</code> per query). A spatial grid usually
+            checks only nearby candidates. Results are still confirmed against exact rectangle
+            bounds.
+          </p>
+        </div>
+      </div>
+      <div class="callout">
+        <span>✳</span>
+        <p>
+          <strong>The trade-off:</strong> objects are stored in each cell they overlap, so larger
+          objects occupy more cells. Choose a cell size close to the typical object or query size.
+        </p>
+      </div>
+    </section>
+    <section id="install">
+      <div class="section-label">02 — INSTALL</div>
+      <h2>Add it to your project.</h2>
+      <pre><code>npm install @amk-utils/spatialhash</code></pre>
+      <p>
+        Works in modern Node.js, bundlers, and browsers. Import the typed package where you need a
+        broad-phase lookup.
+      </p>
+    </section>
+    <section id="quickstart">
+      <div class="section-label">03 — QUICK START</div>
+      <h2>Index once. Query as you move.</h2>
+      <pre><code><span class="kw">import</span> &#123; SpatialHash &#125; <span class="kw">from</span> <span class="str">'@amk-utils/spatialhash'</span>;
+
+  <span class="kw">type</span> Sprite = &#123; x: number; y: number; width: number; height: number; name: string &#125;;
+  <span class="kw">const</span> world = <span class="kw">new</span> SpatialHash&lt;Sprite&gt;(&#123; cellSize: <span class="num">64</span> &#125;);
+
+  world.add(<span class="str">'player'</span>, &#123; x: <span class="num">10</span>, y: <span class="num">20</span>, width: <span class="num">32</span>, height: <span class="num">32</span>, name: <span class="str">'player'</span> &#125;);
+  world.add(<span class="str">'coin'</span>, &#123; x: <span class="num">60</span>, y: <span class="num">40</span>, width: <span class="num">16</span>, height: <span class="num">16</span>, name: <span class="str">'coin'</span> &#125;);
+
+  <span class="kw">const</span> nearby = world.getItemsBetween(<span class="num">0</span>, <span class="num">0</span>, <span class="num">100</span>, <span class="num">100</span>);
+  world.update(<span class="str">'player'</span>, &#123; x: <span class="num">50</span>, y: <span class="num">20</span>, width: <span class="num">32</span>, height: <span class="num">32</span>, name: <span class="str">'player'</span> &#125;);</code></pre>
+      <p>
+        An item needs <code>x</code>, <code>y</code>, <code>width</code>, and <code>height</code>.
+        Keep its ID stable while updating its bounds. IDs can be strings or numbers;
+        <code>1</code> and <code>'1'</code> are distinct.
+      </p>
+    </section>
+    <section id="api">
+      <div class="section-label">04 — API REFERENCE</div>
+      <h2>Small API. Clear behavior.</h2>
+      <div class="api-list">
+        <div class="api-row">
+          <code>new SpatialHash&lt;T&gt;(options?)</code>
+          <p>
+            Creates an empty index. <code>T</code> must extend <code>Bounds</code> and can include
+            any extra payload fields.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>add(id, data): void</code>
+          <p>
+            Adds the item to every grid cell its bounds overlap. Throws if that ID already exists.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>remove(id): boolean</code>
+          <p>
+            Removes the item and its cell memberships. Returns <code>true</code> if it existed;
+            otherwise <code>false</code>.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>update(id, data): void</code>
+          <p>
+            Replaces the payload and bounds, removing old cell memberships and adding new ones as
+            needed. Throws if the ID is missing. Call this when an item moves.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>getItemsBetween(x, y, width, height): T[]</code>
+          <p>
+            Returns payloads whose bounds overlap the rectangle. Touching edges do not count. Result
+            order is undefined.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>size: number</code>
+          <p>Read-only count of stored items, including items whose bounds cover no cells.</p>
+        </div>
+        <div class="api-row">
+          <code>clear(): void</code>
+          <p>Empties the index and releases all cell buckets.</p>
+        </div>
+      </div>
+      <h2>Types you can import</h2>
+      <div class="api-list">
+        <div class="api-row">
+          <code>Bounds</code>
+          <p>
+            The required rectangle shape: numeric <code>x</code>, <code>y</code>,
+            <code>width</code>, and <code>height</code>.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>ItemId</code>
+          <p>A number or string identifier. Numeric and string forms remain distinct.</p>
+        </div>
+        <div class="api-row">
+          <code>Hash</code>
+          <p>A number or string key returned by the hash function for a grid cell.</p>
+        </div>
+        <div class="api-row">
+          <code>HashFunction</code>
+          <p>
+            A callback that receives integer column and row coordinates and returns the bucket key.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>SpatialHashOptions</code>
+          <p>
+            The optional <code>cellSize</code>, <code>threshold</code>, and
+            <code>hashFunction</code> constructor settings.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>SpatialItem&lt;T&gt;</code>
+          <p>
+            The stored-item shape: ID, payload, and cell hashes. Queries return payloads, not
+            wrappers.
+          </p>
+        </div>
+      </div>
+    </section>
+    <section id="options">
+      <div class="section-label">05 — CONFIGURATION</div>
+      <h2>Pick the grid that fits.</h2>
+      <pre><code>new SpatialHash(&#123;
+    cellSize: 64,
+    threshold: 1,
+    hashFunction: (column, row) =&gt; String(column) + ',' + String(row),
+  &#125;);</code></pre>
+      <div class="api-list">
+        <div class="api-row">
+          <code>cellSize</code>
+          <p>
+            World-space width and height of each square cell. Defaults to <code>100</code>; must be
+            greater than zero.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>threshold</code>
+          <p>
+            Extra lookup margin in cell units, on each side of a query. Defaults to
+            <code>1</code>. It broadens candidate collection only; exact overlap still uses the
+            original query rectangle.
+          </p>
+        </div>
+        <div class="api-row">
+          <code>hashFunction(column, row)</code>
+          <p>
+            Maps integer cell coordinates to a string or number key. Defaults to zigzag encoding
+            followed by Cantor pairing, preserving distinct negative coordinates.
+          </p>
+        </div>
+      </div>
+    </section>
+    <section id="internals">
+      <div class="section-label">06 — UNDER THE HOOD</div>
+      <h2>From rectangle to result.</h2>
+      <ol class="steps">
+        <li>
+          <b>01</b>
+          <div>
+            <strong>Cover the cells</strong>
+            <p>
+              Coordinates are divided by <code>cellSize</code> and rounded down. The rectangle's far
+              edge is inset by a tiny epsilon so an edge on a cell boundary doesn't spill into the
+              next cell.
+            </p>
+          </div>
+        </li>
+        <li>
+          <b>02</b>
+          <div>
+            <strong>Index every covered cell</strong>
+            <p>
+              Each cell's integer column and row are hashed into a bucket. A set of IDs in each
+              bucket avoids duplicates.
+            </p>
+          </div>
+        </li>
+        <li>
+          <b>03</b>
+          <div>
+            <strong>Gather candidates</strong>
+            <p>
+              Queries visit their covered cells, expanded by
+              <code>cellSize × threshold</code> around every side, and merge IDs into a unique
+              candidate set.
+            </p>
+          </div>
+        </li>
+        <li>
+          <b>04</b>
+          <div>
+            <strong>Check exact bounds</strong>
+            <p>
+              Candidates are filtered with strict rectangle overlap tests against the unexpanded
+              query. Shared edges alone are excluded.
+            </p>
+          </div>
+        </li>
+      </ol>
+      <h2>Internal helpers</h2>
+      <p>
+        <code>getCellX</code> and <code>getCellY</code> floor world coordinates into integer cell
+        coordinates. <code>getCells</code> enumerates covered cells, returning an empty list for
+        non-positive dimensions. <code>hash</code> calls the configured hash function. The default
+        applies zigzag encoding to support negative coordinates, then Cantor pairing to combine the
+        pair into one number.
+      </p>
+      <p>
+        <code>addToCell</code> creates a bucket when needed and adds an ID.
+        <code>removeFromCell</code> deletes the ID and removes buckets that become empty.
+        <code>haveSameCell</code> detects unchanged coverage so updates only edit grid membership
+        when necessary.
+      </p>
+      <p>
+        <strong>Moving an item:</strong> <code>update</code> recalculates its covered cells. If
+        coverage has not changed, it only replaces the payload. Otherwise it edits only the cells
+        that changed.
+      </p>
+      <p>
+        <strong>Invalid dimensions:</strong> non-positive width or height covers no cells, so that
+        item remains counted in <code>size</code> but won't appear in queries.
+      </p>
+      <p>
+        <strong>Validation:</strong> a cell size at or below zero and a negative threshold throw
+        errors in the constructor.
+      </p>
+      <p>
+        <strong>Hash responsibility:</strong> custom hash functions should return a unique key for
+        each cell coordinate in use. Colliding keys merge buckets and may affect correctness.
+      </p>
+    </section>
+    <footer>Made for things that move. <span>SpatialHash · MIT</span></footer>
+  </article>
+</main>

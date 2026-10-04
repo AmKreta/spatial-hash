@@ -1,0 +1,87 @@
+<main class="demo-page">
+  <div class="demo-heading">
+    <div>
+      <div class="eyebrow">THE GRID IN MOTION</div>
+      <h1>Same particles. <em>Smarter shortlist.</em></h1>
+    </div>
+    <p>
+      Two identical worlds. One checks every pair; the other checks nearby neighbors with
+      SpatialHash.
+    </p>
+  </div>
+  <div class="controls">
+    <label for="count"
+      >Particles <strong>{{ particleCount() }}</strong></label
+    ><input
+      id="count"
+      type="range"
+      min="100"
+      max="1200"
+      step="100"
+      [value]="particleCount()"
+      (input)="setCount($event)"
+    /><span class="control-note">More dots make the difference easier to spot.</span
+    ><button class="button secondary" (click)="toggleRun()">
+      {{ paused() ? 'Resume' : 'Pause' }}
+    </button>
+  </div>
+  <div class="sim-grid">
+    <section class="sim-card">
+      <div class="sim-title">
+        <span class="dot orange"></span>
+        <div>
+          <h2>Brute force</h2>
+          <p>Every possible pair</p>
+        </div>
+        <span class="complexity">O(n²)</span>
+      </div>
+      <canvas #naiveCanvas></canvas>
+      <div class="sim-stats">
+        <div>
+          <strong>{{ naiveStats().checks.toLocaleString() }}</strong
+          ><span>pair checks / frame</span>
+        </div>
+        <div>
+          <strong>{{ naiveStats().hits }}</strong
+          ><span>collisions detected</span>
+        </div>
+      </div>
+    </section>
+    <section class="sim-card">
+      <div class="sim-title">
+        <span class="dot green"></span>
+        <div>
+          <h2>SpatialHash</h2>
+          <p>Nearby pairs only</p>
+        </div>
+        <span class="complexity fast">O(n+k)</span>
+      </div>
+      <canvas #hashCanvas></canvas>
+      <div class="sim-stats">
+        <div>
+          <strong>{{ hashStats().checks.toLocaleString() }}</strong
+          ><span>pair checks / frame</span>
+        </div>
+        <div>
+          <strong>{{ hashStats().hits }}</strong
+          ><span>collisions detected</span>
+        </div>
+      </div>
+    </section>
+  </div>
+  <p class="demo-footnote">
+    Both simulations use straight-line motion (y = mx + c) with randomized dx and dy of ±1 after a
+    wall or particle collision. A line connects each pair of particles whose centers are less than
+    100 pixels apart. The brute-force and SpatialHash canvases each run in a dedicated Web Worker
+    with their own OffscreenCanvas.
+  </p>
+  <div class="demo-insight">
+    <span>↗</span>
+    <p>
+      <strong>What to watch:</strong> at {{ particleCount() }} particles, brute force considers up
+      to n(n − 1) / 2 pairs each frame. SpatialHash narrows each particle's candidates to a local
+      100-pixel neighborhood. Both workers yield between batches so the controls stay responsive at
+      high counts.
+    </p>
+  </div>
+</main>
