@@ -224,10 +224,31 @@ export function startSimulation(mode: SimulationMode): void {
         busy = false;
         return;
       }
-      const query = hash.getItemsBetweenWithStats(target.x, target.y, target.width, target.height);
-      comparisons = query.comparisons;
-      inside = query.items.length;
-      for (const particle of query.items) particle.inTarget = true;
+      if (typeof hash.getItemsBetweenWithStats === 'function') {
+        const query = hash.getItemsBetweenWithStats(target.x, target.y, target.width, target.height);
+        comparisons = query.comparisons;
+        inside = query.items.length;
+        for (const particle of query.items) particle.inTarget = true;
+      } else {
+        // Older published package builds do not expose query statistics. Keep the
+        // simulation working and report the real full-scan comparison count.
+        for (let index = 0; index < frameCount; index++) {
+          const particle = frameParticles[index];
+          comparisons++;
+          if (intersectsTarget(particle, target)) {
+            particle.inTarget = true;
+            inside++;
+          }
+
+          if ((index + 1) % CHUNK_SIZE === 0) {
+            if (!(await yieldToWorkerMessages())) {
+              busy = false;
+              applyPendingCount();
+              return;
+            }
+          }
+        }
+      }
     }
     durationMs = performance.now() - durationMs;
     clearCanvas(context, width, height);
