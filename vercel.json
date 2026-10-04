@@ -7,5 +7,6 @@
       "includeFiles": "docs/dist/spatialhash-docs/**"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "outputDirectory": "docs/dist/spatialhash-docs"
 }
