@@ -1,13 +1,5 @@
 import { bootstrapApplication } from '@angular/platform-browser';
-import { provideRouter, withInMemoryScrolling } from '@angular/router';
-import { AppComponent } from './app/app.component';
-import { routes } from './app/app.routes';
+import { AppShellComponent } from './app/core/layout/app-shell.component';
+import { appConfig } from './app/core/app.config';
 
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideRouter(
-      routes,
-      withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' }),
-    ),
-  ],
-}).catch((error: unknown) => console.error(error));
+bootstrapApplication(AppShellComponent, appConfig).catch((error: unknown) => console.error(error));

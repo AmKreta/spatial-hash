@@ -5,6 +5,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   selector: 'app-root',
   standalone: true,
   imports: [RouterLink, RouterLinkActive, RouterOutlet],
-  templateUrl: './app.component.html',
+  templateUrl: './app-shell.component.html',
 })
-export class AppComponent {}
+export class AppShellComponent {}

@@ -5,17 +5,22 @@
   "scripts": {
     "start": "ng serve",
     "prebuild": "npm run build -w @amk-utils/spatialhash",
-    "build": "ng build --base-href /spatial-hash/",
-    "build:local": "ng build",
-    "pretty": "prettier --write ."
+    "build": "ng build",
+    "build:pages": "ng build --configuration production,githubPages --base-href /spatial-hash/",
+    "prebuild:pages": "npm run build -w @amk-utils/spatialhash",
+    "build:local": "ng build --configuration development",
+    "serve:ssr": "node dist/spatialhash-docs/server/server.mjs"
   },
   "dependencies": {
+    "@amk-utils/spatialhash": "1.0.1",
     "@angular/common": "^20.2.0",
     "@angular/compiler": "^20.2.0",
     "@angular/core": "^20.2.0",
     "@angular/platform-browser": "^20.2.0",
+    "@angular/platform-server": "^20.2.0",
     "@angular/router": "^20.2.0",
-    "@amk-utils/spatialhash": "1.0.1",
+    "@angular/ssr": "^20.3.37",
+    "express": "^5.1.0",
     "rxjs": "~7.8.2",
     "tslib": "^2.8.1",
     "zone.js": "~0.15.1"
@@ -24,6 +29,8 @@
     "@angular/build": "^20.2.0",
     "@angular/cli": "^20.2.0",
     "@angular/compiler-cli": "^20.2.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^20.17.19",
     "typescript": "~5.9.2"
   }
 }

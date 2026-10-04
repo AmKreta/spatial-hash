@@ -1,4 +1,14 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  inject,
+  OnDestroy,
+  PLATFORM_ID,
+  ViewChild,
+  signal,
+} from '@angular/core';
 
 type Stats = { checks: number; hits: number; total: number };
 type SimMessage = { type: 'stats'; checks: number; hits: number; total: number };
@@ -18,16 +28,21 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
   readonly hashStats = signal<Stats>({ checks: 0, hits: 0, total: 100 });
 
   private workers: Worker[] = [];
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
+
     this.startWorker(
       this.naiveCanvas?.nativeElement,
-      () => new Worker(new URL('./brute-force.worker', import.meta.url), { type: 'module' }),
+      () =>
+        new Worker(new URL('./workers/brute-force.worker', import.meta.url), { type: 'module' }),
       this.naiveStats.set,
     );
     this.startWorker(
       this.hashCanvas?.nativeElement,
-      () => new Worker(new URL('./spatial-hash.worker', import.meta.url), { type: 'module' }),
+      () =>
+        new Worker(new URL('./workers/spatial-hash.worker', import.meta.url), { type: 'module' }),
       this.hashStats.set,
     );
   }

@@ -30,3 +30,4 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run build:docs
+      - run: npm run build:pages

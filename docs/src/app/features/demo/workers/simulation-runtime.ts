@@ -5,7 +5,7 @@ import {
   drawConnections,
   drawParticles,
   particleColor,
-} from './canvas-drawing';
+} from '../../../shared/canvas/canvas-drawing';
 
 type Particle = CanvasParticle & {
   x: number;

@@ -26,11 +26,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build:docs
-      - run: cp docs/dist/spatialhash-docs/browser/index.html docs/dist/spatialhash-docs/browser/404.html
+      - run: npm run build:pages
+      - run: cp docs/dist/spatialhash-pages/browser/index.html docs/dist/spatialhash-pages/browser/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/dist/spatialhash-docs/browser
+          path: docs/dist/spatialhash-pages/browser
   deploy:
     environment:
       name: github-pages
