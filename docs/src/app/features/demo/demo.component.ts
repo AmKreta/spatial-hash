@@ -17,8 +17,14 @@ type SimMessage = {
   comparisons: number;
   inside: number;
   durationMs: number;
+  particleCount: number;
 };
-type SampleAccumulator = { frames: number; comparisons: number; durationMs: number };
+type SampleAccumulator = {
+  frames: number;
+  comparisons: number;
+  inside: number;
+  durationMs: number;
+};
 
 const PERFORMANCE_SAMPLE_FRAME_COUNT = 10;
 const MAX_PERFORMANCE_SAMPLES = 60;
@@ -46,11 +52,13 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
   private readonly naiveAccumulator: SampleAccumulator = {
     frames: 0,
     comparisons: 0,
+    inside: 0,
     durationMs: 0,
   };
   private readonly hashAccumulator: SampleAccumulator = {
     frames: 0,
     comparisons: 0,
+    inside: 0,
     durationMs: 0,
   };
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -94,6 +102,7 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
   setCount(event: Event): void {
     const count = Number((event.target as HTMLInputElement).value);
     this.particleCount.set(count);
+    this.resetSamples();
     this.workers.forEach((worker) => worker.postMessage({ type: 'count', count }));
   }
 
@@ -116,7 +125,9 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
 
     const worker = createWorker();
     worker.onmessage = (event: MessageEvent<SimMessage>) => {
-      if (event.data.type === 'stats') update(event.data);
+      if (event.data.type === 'stats' && event.data.particleCount === this.particleCount()) {
+        update(event.data);
+      }
     };
 
     const canvas = element.transferControlToOffscreen();
@@ -131,14 +142,21 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
     comparisonsHistory: typeof this.naiveComparisonsHistory,
     accumulator: SampleAccumulator,
   ): void {
-    current.set(stats);
     accumulator.frames++;
     accumulator.comparisons += stats.comparisons;
+    accumulator.inside += stats.inside;
     accumulator.durationMs += stats.durationMs;
     if (accumulator.frames < PERFORMANCE_SAMPLE_FRAME_COUNT) return;
 
-    const averageComparisons = accumulator.comparisons / accumulator.frames;
-    const averageDuration = accumulator.durationMs / accumulator.frames;
+    const sampledFrames = accumulator.frames;
+    const averageComparisons = accumulator.comparisons / sampledFrames;
+    const averageInside = accumulator.inside / sampledFrames;
+    const averageDuration = accumulator.durationMs / sampledFrames;
+    current.set({
+      comparisons: averageComparisons,
+      inside: Math.round(averageInside),
+      durationMs: averageDuration,
+    });
     history.update((samples) => [
       ...samples.slice(-(MAX_PERFORMANCE_SAMPLES - 1)),
       averageDuration,
@@ -149,6 +167,22 @@ export class DemoComponent implements AfterViewInit, OnDestroy {
     ]);
     accumulator.frames = 0;
     accumulator.comparisons = 0;
+    accumulator.inside = 0;
     accumulator.durationMs = 0;
+  }
+
+  private resetSamples(): void {
+    this.naiveStats.set({ comparisons: 0, inside: 0, durationMs: 0 });
+    this.hashStats.set({ comparisons: 0, inside: 0, durationMs: 0 });
+    this.naiveHistory.set([]);
+    this.hashHistory.set([]);
+    this.naiveComparisonsHistory.set([]);
+    this.hashComparisonsHistory.set([]);
+    for (const accumulator of [this.naiveAccumulator, this.hashAccumulator]) {
+      accumulator.frames = 0;
+      accumulator.comparisons = 0;
+      accumulator.inside = 0;
+      accumulator.durationMs = 0;
+    }
   }
 }

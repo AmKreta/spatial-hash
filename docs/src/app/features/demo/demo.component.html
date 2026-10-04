@@ -28,17 +28,22 @@
 
     <p class="demo-footnote">
       Particles move in straight lines and bounce off the walls. Entering the dotted center target
-      turns a particle bright yellow; particles outside stay muted. Each canvas runs in its own Web
-      Worker with a dedicated OffscreenCanvas. Processing time includes the full brute-force scan or
-      the SpatialHash refresh plus its target query; cooperative yield waits are excluded.
+      brightens a particle's existing color; particles outside stay muted. Each canvas runs in its
+      own Web Worker with a dedicated OffscreenCanvas. The SpatialHash index persists between frames
+      and updates membership only when a particle crosses a cell boundary. Processing time includes
+      movement plus the full scan or index maintenance and target query; drawing and yield waits are
+      excluded. Cards and charts show the same 10-frame averages.
     </p>
 
     <div class="demo-insight">
       <span aria-hidden="true">↗</span>
       <p>
-        <strong>What to watch:</strong> brute force checks all n particle positions. SpatialHash
-        checks only k candidates from cells around the target. The scan is O(n); the indexed query
-        is O(k) after an O(n) refresh for the moving particles.
+        <strong>What this demonstrates:</strong> find all particles inside the center target
+        viewport. Brute force checks all n positions; SpatialHash checks candidates in nearby cells.
+        <br /><br />
+        <strong>How to compare:</strong> raise the particle count, compare positions checked, then
+        read the 10-frame processing-time average. That timing includes index upkeep, so one target
+        lookup can still favor a direct scan.
       </p>
     </div>
   </aside>
@@ -62,7 +67,7 @@
           </div>
           <div>
             <strong>{{ naiveStats().durationMs.toFixed(3) }} ms</strong>
-            <span>full scan / frame</span>
+            <span>movement + scan / frame</span>
           </div>
           <div>
             <strong>{{ naiveStats().inside.toLocaleString() }}</strong>
@@ -88,7 +93,7 @@
           </div>
           <div>
             <strong>{{ hashStats().durationMs.toFixed(3) }} ms</strong>
-            <span>index + query / frame</span>
+            <span>movement + index + query / frame</span>
           </div>
           <div>
             <strong>{{ hashStats().inside.toLocaleString() }}</strong>
@@ -106,7 +111,7 @@
         [spatialHash]="hashComparisonsHistory()"
       />
       <app-performance-chart
-        title="Detection time · 10-frame average"
+        title="Processing time · 10-frame average"
         unit="ms / frame"
         [bruteForce]="naiveHistory()"
         [spatialHash]="hashHistory()"

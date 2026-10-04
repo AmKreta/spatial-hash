@@ -15,7 +15,12 @@ type Particle = CanvasParticle & {
   height: number;
   vx: number;
   vy: number;
+  rngState: number;
   index: number;
+  indexedMinCellX: number;
+  indexedMaxCellX: number;
+  indexedMinCellY: number;
+  indexedMaxCellY: number;
 };
 
 type WorkerMessage =
@@ -29,6 +34,7 @@ type Stats = {
   comparisons: number;
   inside: number;
   durationMs: number;
+  particleCount: number;
 };
 
 const TARGET_CELL_SIZE = 100;
@@ -42,9 +48,63 @@ export function startSimulation(mode: SimulationMode): void {
   let context: OffscreenCanvasRenderingContext2D | null = null;
   let running = true;
   let busy = false;
-  let lastTime = 0;
   let random = Math.random;
+  let workerSeed = 0;
+  let pendingCount: number | undefined;
   const particles: Particle[] = [];
+  const hash =
+    mode === 'spatial-hash'
+      ? new SpatialHash<Particle>({ cellSize: TARGET_CELL_SIZE, threshold: 0 })
+      : undefined;
+
+  function getCellBounds(particle: Particle) {
+    return {
+      minX: Math.floor(particle.x / TARGET_CELL_SIZE),
+      maxX: Math.ceil((particle.x + particle.width) / TARGET_CELL_SIZE) - 1,
+      minY: Math.floor(particle.y / TARGET_CELL_SIZE),
+      maxY: Math.ceil((particle.y + particle.height) / TARGET_CELL_SIZE) - 1,
+    };
+  }
+
+  function rememberCellBounds(particle: Particle): void {
+    const bounds = getCellBounds(particle);
+    particle.indexedMinCellX = bounds.minX;
+    particle.indexedMaxCellX = bounds.maxX;
+    particle.indexedMinCellY = bounds.minY;
+    particle.indexedMaxCellY = bounds.maxY;
+  }
+
+  function nextParticleRandom(particle: Particle): number {
+    particle.rngState = (particle.rngState * 1_664_525 + 1_013_904_223) >>> 0;
+    return particle.rngState / 4_294_967_296;
+  }
+
+  function hasChangedCells(particle: Particle): boolean {
+    const right = particle.x + particle.width;
+    const bottom = particle.y + particle.height;
+    const spansCellsX = particle.indexedMinCellX !== particle.indexedMaxCellX;
+    const spansCellsY = particle.indexedMinCellY !== particle.indexedMaxCellY;
+    const crossedX =
+      particle.vx > 0
+        ? spansCellsX
+          ? particle.x >= (particle.indexedMinCellX + 1) * TARGET_CELL_SIZE
+          : right > (particle.indexedMaxCellX + 1) * TARGET_CELL_SIZE
+        : spansCellsX
+          ? right <= particle.indexedMaxCellX * TARGET_CELL_SIZE
+          : particle.x < particle.indexedMinCellX * TARGET_CELL_SIZE;
+    const crossedY =
+      particle.vy > 0
+        ? spansCellsY
+          ? particle.y >= (particle.indexedMinCellY + 1) * TARGET_CELL_SIZE
+          : bottom > (particle.indexedMaxCellY + 1) * TARGET_CELL_SIZE
+        : spansCellsY
+          ? bottom <= particle.indexedMaxCellY * TARGET_CELL_SIZE
+          : particle.y < particle.indexedMinCellY * TARGET_CELL_SIZE;
+    const crossedCellBoundary = crossedX || crossedY;
+
+    if (crossedCellBoundary) rememberCellBounds(particle);
+    return crossedCellBoundary;
+  }
 
   function setCount(count: number): void {
     if (!canvas) return;
@@ -56,7 +116,7 @@ export function startSimulation(mode: SimulationMode): void {
       const maxY = Math.max(PARTICLE_RADIUS, canvas.height - PARTICLE_RADIUS);
       const cx = PARTICLE_RADIUS + random() * (maxX - PARTICLE_RADIUS);
       const cy = PARTICLE_RADIUS + random() * (maxY - PARTICLE_RADIUS);
-      particles.push({
+      const particle: Particle = {
         x: cx - PARTICLE_RADIUS,
         y: cy - PARTICLE_RADIUS,
         cx,
@@ -68,11 +128,22 @@ export function startSimulation(mode: SimulationMode): void {
         inTarget: false,
         vx: random() < 0.5 ? -1 : 1,
         vy: random() < 0.5 ? -1 : 1,
+        rngState: (workerSeed ^ Math.imul(index + 1, 0x9e3779b9)) >>> 0,
         index,
-      });
+        indexedMinCellX: 0,
+        indexedMaxCellX: 0,
+        indexedMinCellY: 0,
+        indexedMaxCellY: 0,
+      };
+      rememberCellBounds(particle);
+      particles.push(particle);
+      hash?.add(particle.index, particle);
     }
 
-    particles.length = target;
+    while (particles.length > target) {
+      const particle = particles.pop();
+      if (particle) hash?.remove(particle.index);
+    }
   }
 
   function getTargetRegion(width: number, height: number): TargetRegion {
@@ -100,15 +171,13 @@ export function startSimulation(mode: SimulationMode): void {
     return running;
   }
 
-  async function tick(time: number): Promise<void> {
+  async function tick(): Promise<void> {
     if (!canvas || !context || busy || !running) return;
     busy = true;
 
     const width = canvas.width;
     const height = canvas.height;
-    const elapsed = lastTime ? (time - lastTime) / 16.67 : 1;
-    const delta = Math.min(2, elapsed);
-    lastTime = time;
+    const delta = 1;
     const frameParticles = particles.slice();
     const frameCount = frameParticles.length;
 
@@ -116,25 +185,24 @@ export function startSimulation(mode: SimulationMode): void {
       particle.cx += particle.vx * delta;
       particle.cy += particle.vy * delta;
       if (particle.cx < particle.radius || particle.cx > width - particle.radius) {
-        particle.vx = random() < 0.5 ? -1 : 1;
+        particle.vx = nextParticleRandom(particle) < 0.5 ? -1 : 1;
         particle.cx = Math.max(particle.radius, Math.min(width - particle.radius, particle.cx));
       }
       if (particle.cy < particle.radius || particle.cy > height - particle.radius) {
-        particle.vy = random() < 0.5 ? -1 : 1;
+        particle.vy = nextParticleRandom(particle) < 0.5 ? -1 : 1;
         particle.cy = Math.max(particle.radius, Math.min(height - particle.radius, particle.cy));
       }
       particle.x = particle.cx - particle.radius;
       particle.y = particle.cy - particle.radius;
       particle.inTarget = false;
+      if (hash && hasChangedCells(particle)) hash.update(particle.index, particle);
     }
 
     const target = getTargetRegion(width, height);
     let comparisons = 0;
     let inside = 0;
-    let durationMs = 0;
-
+    let durationMs = performance.now();
     if (mode === 'brute-force') {
-      let segmentStartedAt = performance.now();
       for (let index = 0; index < frameCount; index++) {
         const particle = frameParticles[index];
         comparisons++;
@@ -144,49 +212,45 @@ export function startSimulation(mode: SimulationMode): void {
         }
 
         if ((index + 1) % CHUNK_SIZE === 0) {
-          durationMs += performance.now() - segmentStartedAt;
           if (!(await yieldToWorkerMessages())) {
             busy = false;
+            applyPendingCount();
             return;
           }
-          segmentStartedAt = performance.now();
         }
       }
-      durationMs += performance.now() - segmentStartedAt;
     } else {
-      let segmentStartedAt = performance.now();
-      const hash = new SpatialHash<Particle>({ cellSize: TARGET_CELL_SIZE, threshold: 0 });
-      for (let index = 0; index < frameCount; index++) {
-        const particle = frameParticles[index];
-        hash.add(particle.index, particle);
-
-        if ((index + 1) % CHUNK_SIZE === 0) {
-          durationMs += performance.now() - segmentStartedAt;
-          if (!(await yieldToWorkerMessages())) {
-            busy = false;
-            return;
-          }
-          segmentStartedAt = performance.now();
-        }
+      if (!hash) {
+        busy = false;
+        return;
       }
-
-      durationMs += performance.now() - segmentStartedAt;
-      const queryStartedAt = performance.now();
       const query = hash.getItemsBetweenWithStats(target.x, target.y, target.width, target.height);
-      durationMs += performance.now() - queryStartedAt;
       comparisons = query.comparisons;
       inside = query.items.length;
       for (const particle of query.items) particle.inTarget = true;
     }
-
+    durationMs = performance.now() - durationMs;
     clearCanvas(context, width, height);
     drawParticles(context, frameParticles);
     drawTargetBorder(context, target);
 
-    const message: Stats = { type: 'stats', comparisons, inside, durationMs };
+    const message: Stats = {
+      type: 'stats',
+      comparisons,
+      inside,
+      durationMs,
+      particleCount: frameCount,
+    };
     postMessage(message);
     busy = false;
-    if (running) requestAnimationFrame((nextTime) => void tick(nextTime));
+    applyPendingCount();
+    if (running) requestAnimationFrame(() => void tick());
+  }
+
+  function applyPendingCount(): void {
+    if (pendingCount === undefined) return;
+    setCount(pendingCount);
+    pendingCount = undefined;
   }
 
   onmessage = (event: MessageEvent<WorkerMessage>) => {
@@ -194,18 +258,20 @@ export function startSimulation(mode: SimulationMode): void {
     if (message.type === 'init') {
       canvas = message.canvas;
       context = canvas.getContext('2d');
-      let seed = message.seed >>> 0;
+      workerSeed = message.seed >>> 0;
+      let seed = workerSeed;
       random = () => {
         seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
         return seed / 4_294_967_296;
       };
       setCount(message.count);
-      requestAnimationFrame((time) => void tick(time));
+      requestAnimationFrame(() => void tick());
     } else if (message.type === 'count') {
-      setCount(message.count);
+      if (busy) pendingCount = message.count;
+      else setCount(message.count);
     } else if (message.type === 'run') {
       running = message.running;
-      if (running && !busy) requestAnimationFrame((time) => void tick(time));
+      if (running && !busy) requestAnimationFrame(() => void tick());
     }
   };
 }
