@@ -1,4 +1,12 @@
-import { Bounds, Hash, HashFunction, ItemId, SpatialHashOptions, SpatialItem } from './types';
+import {
+  Bounds,
+  Hash,
+  HashFunction,
+  ItemId,
+  SpatialHashOptions,
+  SpatialHashQueryResult,
+  SpatialItem,
+} from './types';
 import { cantorPairing } from './utils/contorPairing';
 import { zigZagEncode } from './utils/zigZagEncode';
 
@@ -25,6 +33,8 @@ export class SpatialHash<T extends Bounds> {
   private readonly grid = new Map<Hash, Set<ItemId>>();
   /** Item id to its payload and the cell hashes it occupies. */
   private readonly items = new Map<ItemId, SpatialItem<T>>();
+  /** Reused scratch set for synchronous queries, avoiding one allocation per lookup. */
+  private readonly queryCandidates = new Set<ItemId>();
   /** Maps a cell column and row to a bucket key. */
   private readonly hashFunction: HashFunction;
 
@@ -135,44 +145,81 @@ export class SpatialHash<T extends Bounds> {
    * @returns Payloads of the intersecting items. Order is not defined.
    */
   getItemsBetween(x: number, y: number, width: number, height: number): T[] {
-    const padding = this.cellSize * this.threshold;
+    return this.queryItemsBetween(x, y, width, height).items;
+  }
 
+  /**
+   * Returns intersecting items and the number of candidate bounds checked.
+   * This can be used to instrument queries without counting items rejected by the grid.
+   * @param x - Left edge of the query rectangle.
+   * @param y - Top edge of the query rectangle.
+   * @param width - Width of the query rectangle.
+   * @param height - Height of the query rectangle.
+   * @returns Matching payloads and candidate bounds comparison count.
+   */
+  getItemsBetweenWithStats(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): SpatialHashQueryResult<T> {
+    return this.queryItemsBetween(x, y, width, height);
+  }
+
+  private queryItemsBetween(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): SpatialHashQueryResult<T> {
+    if (width <= 0 || height <= 0) {
+      return { items: [], comparisons: 0 };
+    }
+
+    const padding = this.cellSize * this.threshold;
     const queryX = x - padding;
     const queryY = y - padding;
-
     const queryWidth = width + padding * 2;
     const queryHeight = height + padding * 2;
 
-    const cells = this.getCells(queryX, queryY, queryWidth, queryHeight);
+    const minCellX = this.getCellX(queryX);
+    const minCellY = this.getCellY(queryY);
+    const maxCellX = Math.ceil((queryX + queryWidth) / this.cellSize) - 1;
+    const maxCellY = Math.ceil((queryY + queryHeight) / this.cellSize) - 1;
+    const candidates = this.queryCandidates;
+    candidates.clear();
 
-    const candidates = new Set<ItemId>();
-
-    for (const cell of cells) {
-      const bucket = this.grid.get(cell);
-      if (!bucket) {
-        continue;
+    for (let cy = minCellY; cy <= maxCellY; cy++) {
+      for (let cx = minCellX; cx <= maxCellX; cx++) {
+        const bucket = this.grid.get(this.hash(cx, cy));
+        if (!bucket) {
+          continue;
+        }
+        for (const id of bucket) {
+          candidates.add(id);
+        }
       }
-      bucket.forEach((id) => candidates.add(id));
     }
 
-    const result: SpatialItem<T>[] = [];
-
-    candidates.forEach((id) => {
+    const result: T[] = [];
+    let comparisons = 0;
+    for (const id of candidates) {
       const item = this.items.get(id);
       if (!item) {
-        return;
+        continue;
       }
+      comparisons++;
       if (
         item.data.x < x + width &&
         item.data.x + item.data.width > x &&
         item.data.y < y + height &&
         item.data.y + item.data.height > y
       ) {
-        result.push(item);
+        result.push(item.data);
       }
-    });
+    }
 
-    return result.map((item) => item.data);
+    return { items: result, comparisons };
   }
 
   /** Number of items currently stored. */
@@ -184,6 +231,7 @@ export class SpatialHash<T extends Bounds> {
   clear(): void {
     this.grid.clear();
     this.items.clear();
+    this.queryCandidates.clear();
   }
 
   /**
@@ -206,8 +254,8 @@ export class SpatialHash<T extends Bounds> {
 
   /**
    * Lists the cell hashes covered by an axis-aligned rectangle.
-   * The far edges are inset by one epsilon so a rectangle that ends on a
-   * cell boundary is not also indexed in the next cell.
+   * The far edges are exclusive, so a rectangle that ends on a cell boundary
+   * is not also indexed in the next cell.
    * @param x - Left edge.
    * @param y - Top edge.
    * @param width - Rectangle width.
@@ -221,8 +269,8 @@ export class SpatialHash<T extends Bounds> {
 
     const minCellX = this.getCellX(x);
     const minCellY = this.getCellY(y);
-    const maxCellX = this.getCellX(x + width - Number.EPSILON);
-    const maxCellY = this.getCellY(y + height - Number.EPSILON);
+    const maxCellX = Math.ceil((x + width) / this.cellSize) - 1;
+    const maxCellY = Math.ceil((y + height) / this.cellSize) - 1;
 
     const cells: Hash[] = [];
 
