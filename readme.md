@@ -2,6 +2,9 @@
 
 SpatialHash is a uniform grid for finding nearby axis-aligned items in games, canvases, and maps. This repository is organized as a small monorepo:
 
+- [Live documentation and demo](https://spatial-hash.vercel.app/)
+- [npm package](https://www.npmjs.com/package/@amk-utils/spatialhash)
+
 - [`source/`](source/README.md) — the TypeScript library, tests, and npm package.
 - [`docs/`](docs/) — Angular documentation and an interactive particle collision demo.
 
@@ -41,7 +44,3 @@ npm run format
 npm run format:check
 npm run lint
 ```
-
-## Publish
-
-The `Publish source package` workflow runs on changes to `source/` on `main`. It typechecks, tests, builds, and publishes the npm package with provenance. The `Deploy documentation` workflow publishes the Angular site to GitHub Pages when docs or source files change on `main`, or when started manually. Enable **Settings → Pages → Build and deployment → GitHub Actions** in the repository for the first deployment.

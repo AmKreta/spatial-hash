@@ -2,6 +2,9 @@
 
 A uniform grid for axis-aligned items. Each item is stored in every cell its bounds overlap. A rectangle query collects the ids in those cells, then keeps only the items whose bounds actually intersect the rectangle.
 
+- [Documentation and interactive demo](https://spatial-hash.vercel.app/)
+- [npm package page](https://www.npmjs.com/package/@amk-utils/spatialhash)
+
 Use it when you need nearby objects in a 2D scene — sprites, colliders, map markers — without testing every item.
 
 ## Use cases

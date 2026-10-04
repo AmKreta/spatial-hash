@@ -8,5 +8,5 @@
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
-  "outputDirectory": "docs/dist/spatialhash-docs"
+  "outputDirectory": "docs/dist/spatialhash-docs/browser"
 }
